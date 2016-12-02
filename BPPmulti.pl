@@ -73,6 +73,7 @@ my $UseiBPP_intgr   = 1; # use iBPP for an integrative analysis
 my $UseiBPP_trait   = 1; # use iBPP for an analysis on continuous traits only
 
 my $executeAnalyses = 1; # set to 1 if you want to run the analyses
+my $repeats         = 5; # set the number of repeats for each analysis
 
 #=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 # USER SETTINGS ARE FINISHED HERE
@@ -125,70 +126,73 @@ my $speciestree;
 my $useseqdata;
 my $usetraitdata;
 
-my $mode = ">"; # overwrite 'final_output.txt' in the first iteration of parseFinal()
 
 print "Parsing Imap file\n";
 my $SpeciesNumberString = &parseImap ($Imapfile);
 
 
 # write control files
-for (my $th_i = 0; $th_i < scalar @thetapriors; $th_i++) {
-	for (my $tau_i = 0; $tau_i < scalar @taupriors; $tau_i++) {
-		my $i = 1;
-		foreach my $tree (@trees) {
-			my $analysis_base;
-			$analysis_base = sprintf "std.theta%d-tau%d.Tree%d", $th_i+1, $tau_i+1, $i;
-			
-			# prior only
-			if ($UseBPP_prior == 1) {
-				my $analysis = $analysis_base . '.BPP.prior';
-				push (@analyses, $analysis);
-				$speciesdelimitation = $speciesDelimitationBPP;
-				$speciestree         = 0;
-				$useseqdata          = 0;
-				&makeControlBPP ($analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+for (my $rep_i = 0; $rep_i < $repeats; $rep_i++) {
+	for (my $th_i = 0; $th_i < scalar @thetapriors; $th_i++) {
+		for (my $tau_i = 0; $tau_i < scalar @taupriors; $tau_i++) {
+			my $i = 1;
+			foreach my $tree (@trees) {
+				my $analysis_base;
+				my $wdir_rep;
+				$wdir_rep      = $wdir.'repeat'.$rep_i.'/';
+				$analysis_base = sprintf "std.theta%d-tau%d.Tree%d", $th_i+1, $tau_i+1, $i;
+				
+				# prior only
+				if ($UseBPP_prior == 1) {
+					my $analysis = $analysis_base . '.BPP.prior';
+					push (@analyses, $analysis) if $rep_i == 0;
+					$speciesdelimitation = $speciesDelimitationBPP;
+					$speciestree         = 0;
+					$useseqdata          = 0;
+					&makeControlBPP ($wdir_rep, $analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+				}
+				
+				# molecular data
+				if ($UseBPP == 1) {
+					my $analysis = $analysis_base . '.BPP.mol';
+					push (@analyses, $analysis) if $rep_i == 0;
+					$speciesdelimitation = $speciesDelimitationBPP;
+					$speciestree         = 0;
+					$useseqdata          = 1;
+					&makeControlBPP ($wdir_rep, $analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+				}
+				
+				# molecular data + species tree
+				if ($UseBPP_NNI == 1) {
+					my $analysis = $analysis_base . '.BPP.mol-NNI';
+					push (@analyses, $analysis) if $rep_i == 0;
+					$speciesdelimitation = $speciesDelimitationBPP;
+					$speciestree         = 1;
+					$useseqdata          = 1;
+					&makeControlBPP ($wdir_rep, $analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+				}
+				
+				# trait data
+				if ($UseiBPP_trait == 1) {
+					my $analysis = $analysis_base . '.iBPP.trait';
+					push (@analyses, $analysis) if $rep_i == 0;
+					$speciesdelimitation = $speciesDelimitationIBPP;
+					$useseqdata          = 0;
+					$usetraitdata        = 1;
+					&makeControliBPP ($wdir_rep, $analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+				}
+				
+				# integrative
+				if ($UseiBPP_intgr == 1) {
+					my $analysis = $analysis_base . '.iBPP.intgr';
+					push (@analyses, $analysis) if $rep_i == 0;
+					$speciesdelimitation = $speciesDelimitationIBPP;
+					$useseqdata          = 1;
+					$usetraitdata        = 1;
+					&makeControliBPP ($wdir_rep, $analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
+				}
+				$i++;
 			}
-			
-			# molecular data
-			if ($UseBPP == 1) {
-				my $analysis = $analysis_base . '.BPP.mol';
-				push (@analyses, $analysis);
-				$speciesdelimitation = $speciesDelimitationBPP;
-				$speciestree         = 0;
-				$useseqdata          = 1;
-				&makeControlBPP ($analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
-			}
-			
-			# molecular data + species tree
-			if ($UseBPP_NNI == 1) {
-				my $analysis = $analysis_base . '.BPP.mol-NNI';
-				push (@analyses, $analysis);
-				$speciesdelimitation = $speciesDelimitationBPP;
-				$speciestree         = 1;
-				$useseqdata          = 1;
-				&makeControlBPP ($analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
-			}
-			
-			# trait data
-			if ($UseiBPP_trait == 1) {
-				my $analysis = $analysis_base . '.iBPP.trait';
-				push (@analyses, $analysis);
-				$speciesdelimitation = $speciesDelimitationIBPP;
-				$useseqdata          = 0;
-				$usetraitdata        = 1;
-				&makeControliBPP ($analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
-			}
-			
-			# integrative
-			if ($UseiBPP_intgr == 1) {
-				my $analysis = $analysis_base . '.iBPP.intgr';
-				push (@analyses, $analysis);
-				$speciesdelimitation = $speciesDelimitationIBPP;
-				$useseqdata          = 1;
-				$usetraitdata        = 1;
-				&makeControliBPP ($analysis, $SpeciesNumberString, $tree, $thetapriors[$th_i], $taupriors[$tau_i]);
-			}
-			$i++;
 		}
 	}
 }
@@ -199,28 +203,22 @@ if ($executeAnalyses == 1) {
 
 	" . scalar localtime() . ": Starting execution of standard prior runs
 	=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~\n";
-	# parallel execution of standard prior runs
-	for (my $i = 0; $i < scalar @analyses; $i++) {
-		sleep(1) while(scalar threads->list(threads::running) >= $maxThreads); # Limit threads running
-		push(@threads, threads->create (\&runBPP, $analyses[$i]));             # Create and run next thread
-		print scalar localtime() . ": Executed $analyses[$i]\n";
-		sleep(5); # wait some seconds - I think that it might be possible that the working directory is changed for the next submission before the command is executed. If so, output files would be written into the wrong directories...
+	# parallel execution of BPP instances
+	for (my $rep_i = 0; $rep_i < $repeats; $rep_i++) {
+		my $wdir_rep;
+		$wdir_rep = $wdir.'repeat'.$rep_i.'/';
+		for (my $i = 0; $i < scalar @analyses; $i++) {
+			sleep(1) while(scalar threads->list(threads::running) >= $maxThreads); # Limit threads running
+			push(@threads, threads->create (\&runBPP, $wdir_rep, $analyses[$i]));  # Create and run next thread
+			print scalar localtime() . ": Executed $analyses[$i] in repeat$rep_i\n";
+			sleep(5); # wait some seconds - I think that strange things might happen otherwise...
+		}
 	}
 	# Thread cleanup
 	sleep(5);
 	foreach my $thread (threads->list(threads::all)) {
 		$thread->join();
 	}
-
-	# parsing output of final analyses
-	print "
-
-Collecting output information to 'final_output.txt'
-=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~\n";
-	foreach my $analysis (@analyses) {
-		&parseFinal ($analysis);
-	}
-	@analyses = ();
 }
 
 
@@ -229,6 +227,7 @@ exit;
 #=~ subs ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 sub makeControlBPP {
 	# get arguments
+	my $wdir                = shift @_;
 	my $analysis            = shift @_;
 	my $SpeciesNumberString = shift @_;
 	my $tree                = shift @_;
@@ -237,6 +236,8 @@ sub makeControlBPP {
 	
 	# make subdir
 	print "Making subdirectory for analysis $analysis\n";
+	mkdir ($wdir);
+	chdir ($wdir);
 	mkdir ($wdir.$analysis);
 	chdir ($wdir.$analysis);
 
@@ -249,8 +250,8 @@ sub makeControlBPP {
 	print $FH "
 seed     = -1
 	
-seqfile  = ../$seqfile
-Imapfile = ../$Imapfile
+seqfile  = ../../$seqfile
+Imapfile = ../../$Imapfile
 outfile  = $analysis.out.txt
 mcmcfile = $analysis.mcmc.txt
 
@@ -268,8 +269,8 @@ cleandata  = $cleandata
 thetaprior = $thetaprior
 tauprior   = $tauprior
 
-heredity   = $heredity ../$heredityfile
-locusrate  = $locusrate ../$locusratefile
+heredity   = $heredity ../../$heredityfile
+locusrate  = $locusrate ../../$locusratefile
 
 finetune   = $finetune
 
@@ -284,6 +285,7 @@ close $FH or die "Can't close '$file': $!\n";
 
 sub makeControliBPP {
 	# get arguments
+	my $wdir                = shift @_;
 	my $analysis            = shift @_;
 	my $SpeciesNumberString = shift @_;
 	my $tree                = shift @_;
@@ -292,6 +294,8 @@ sub makeControliBPP {
 	
 	# make subdir
 	print "Making subdirectory for analysis $analysis\n";
+	mkdir ($wdir);
+	chdir ($wdir);
 	mkdir ($wdir.$analysis);
 	chdir ($wdir.$analysis);
 
@@ -304,9 +308,9 @@ sub makeControliBPP {
 	print $FH "
 seed     = -1
 	
-seqfile  = ../$seqfile
-Imapfile = ../$Imapfile
-traitfile = ../$traitfile
+seqfile  = ../../$seqfile
+Imapfile = ../../$Imapfile
+traitfile = ../../$traitfile
 outfile  = $analysis.out.txt
 mcmcfile = $analysis.mcmc.txt
 
@@ -328,8 +332,8 @@ tauprior     = $tauprior
 nu0          = $nu0
 kappa0       = $kappa0
 
-heredity   = $heredity ../$heredityfile
-locusrate  = $locusrate ../$locusratefile
+heredity   = $heredity ../../$heredityfile
+locusrate  = $locusrate ../../$locusratefile
 
 finetune     = $finetune
 
@@ -367,53 +371,9 @@ sub parseImap {
 	close $FH or die "Can't close '$ImapFile': $!\n";
 }
 
-sub parseBPPoutput {
-	# get arguments
-	my $file = shift @_;
-	open (my $FH, "<", $file) or die "Can't open '$file': $!\n";
-	
-	my ($theta, $thetaSD, $tau, $tauSD);
-	
-	my $count_flag = 0;
-	my $count = 0;
-	my $thetaINDEX;
-	my $tauINDEX;
-	while (my $line = <$FH>) {
-		$line =~ s/(^\s+)|(\s+$)//g;
-		$count++ if $count_flag == 1;
-		# search for 'Summary of MCMC results'
-		if ($line =~ m/theta/) { # search for indices: last theta followed by first tau
-			my @split = split (/\s+/, $line);
-			my $i = 0;
-			foreach my $value (@split) {
-				$i++;
-				if ($value =~ m/^tau/) {
-					$thetaINDEX = $i-1;
-					$tauINDEX   = $i;
-					$count_flag = 1;
-					last;
-				}
-			}
-		}
-		
-		if ($count == 1) {
-			my @split = split (/\s+/, $line);
-			$theta = $split[$thetaINDEX];
-			$tau   = $split[$tauINDEX];
-		} elsif ($count == 3) {
-			my @split = split (/\s+/, $line);
-			$thetaSD = $split[$thetaINDEX];
-			$tauSD   = $split[$tauINDEX];
-			last;
-		}
-	}
-	
-	return ($theta, $thetaSD, $tau, $tauSD);
-	close $FH or die "Can't close '$file': $!\n";
-}
-
 sub runBPP {
 # the routine to start in the above multithread section:
+	my $wdir     = shift @_;
 	my $analysis = shift @_;
 	chdir ($wdir.$analysis);
 	
@@ -426,38 +386,4 @@ sub runBPP {
 	}
 	
 	async{`$cmd`};
-}
-
-sub parseFinal {
-	# get argument
-	my $analysis = shift @_;
-	
-	chdir ($wdir);
-	open (my $FHout, $mode, 'final_output.txt') or die "Can't open 'final_output.txt': $!\n";
-	$mode = ">>"; # append subsequent parsing results
-		
-	chdir ($wdir.$analysis);
-	my $file = "$analysis.out.txt";
-	open (my $FH, "<", $file) or die "Can't open '$file': $!\n";
-	
-	print $FHout " Output of analysis $analysis
-=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~\n\n";
-	
-	my $write_flag = 0;
-	while (my $line = <$FH>) {
-		$line =~ s/(\s+$)//;
-		
-		if ($write_flag == 0) {
-			if ($line =~ m/(^Current Pjump)|(^Tree frequencies)|(^spnode)|(^Summarizing)/) {
-				$write_flag = 1;
-				print $FHout "$line\n";
-			}
-		} else {
-			print $FHout "$line\n";
-		}
-	}
-	print $FHout "\n\n\n\n\n\n";
-	
-	close $FH or die "Can't close '$file': $!\n";
-	close $FHout or die "Can't close 'final_output.txt': $!\n";
 }
